@@ -538,66 +538,38 @@ dotButton.addEventListener("click", () => {
     return;
   }
 
-  let W = parseInt(beadWidthInput.value,10);
-  let H = parseInt(beadHeightInput.value,10);
+  let W = parseInt(beadWidthInput.value, 10);
+  let H = parseInt(beadHeightInput.value, 10);
   if (!W || !H || W <= 0 || H <= 0) {
     alert("가로·세로 비즈 개수를 올바르게 입력해 주십시오.");
     return;
   }
 
+  // 팔레트 읽기
   let pal = parsePaletteFromUI();
   if (!pal.length) {
     alert("팔레트가 비어 있습니다. 색상과 비즈 번호를 입력해 주십시오.");
     return;
   }
-// -----------------------------
-// 색 개수 제한: 많이 쓰인 색 상위 N개
-// -----------------------------
-const colorCountVal = parseInt(colorCountInput.value, 10);
-let usedArray = Array.from(usedColorStats.values());
 
-if (!Number.isNaN(colorCountVal) && colorCountVal > 0 && colorCountVal < usedArray.length) {
-  // 사용량 기준 정렬 (내림차순)
-  usedArray.sort((a, b) => b.count - a.count);
-
-  // 상위 N개 색만 사용
-  const limitedPalette = usedArray.slice(0, colorCountVal).map(v => v.color);
-
-  // cellInfo를 limitedPalette 기준으로 다시 매핑
-  const newStats = new Map();
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const orig = cellInfo[y][x];
-      const c2 = nearestColor(orig.r, orig.g, orig.b, limitedPalette);
-      cellInfo[y][x] = c2;
-
-      let stat = newStats.get(c2.hex);
-      if (!stat) {
-        stat = { color: c2, count: 0 };
-        newStats.set(c2.hex, stat);
-      }
-      stat.count++;
-    }
-  }
-
-  usedColorStats = newStats;
-}
-  // 심볼 부여
+  // 기호 부여
   pal.forEach((p, idx) => {
     p.symbol = SYMBOLS[idx % SYMBOLS.length];
   });
-  palette = pal;
+  palette = pal; // 전역 팔레트에 반영
 
   statusEl.textContent = "도안을 생성하는 중입니다...";
 
-  // 원본 이미지를 W x H로 축소 (맞추는 방식 반영)
+  // -----------------------------
+  // 원본 이미지를 W x H 로 축소 (맞추는 방식 적용)
+  // -----------------------------
   const temp = document.createElement("canvas");
   temp.width = W;
   temp.height = H;
   const tctx = temp.getContext("2d");
 
   tctx.fillStyle = "white";
-  tctx.fillRect(0,0,W,H);
+  tctx.fillRect(0, 0, W, H);
 
   const iw = loadedImage.width;
   const ih = loadedImage.height;
@@ -605,46 +577,119 @@ if (!Number.isNaN(colorCountVal) && colorCountVal > 0 && colorCountVal < usedArr
 
   let dw, dh, dx, dy, scale;
   if (mode === "fit") {
-    scale = Math.min(W/iw, H/ih);
-    dw = iw*scale; dh = ih*scale;
-    dx = (W-dw)/2; dy = (H-dh)/2;
+    scale = Math.min(W / iw, H / ih);
+    dw = iw * scale; dh = ih * scale;
+    dx = (W - dw) / 2; dy = (H - dh) / 2;
   } else if (mode === "cover") {
-    scale = Math.max(W/iw, H/ih);
-    dw = iw*scale; dh = ih*scale;
-    dx = (W-dw)/2; dy = (H-dh)/2;
+    scale = Math.max(W / iw, H / ih);
+    dw = iw * scale; dh = ih * scale;
+    dx = (W - dw) / 2; dy = (H - dh) / 2;
   } else { // stretch
     dw = W; dh = H; dx = 0; dy = 0;
   }
   tctx.drawImage(loadedImage, dx, dy, dw, dh);
 
-  const imgData = tctx.getImageData(0,0,W,H);
+  const imgData = tctx.getImageData(0, 0, W, H);
   const d = imgData.data;
 
+  // -----------------------------
+  // 1차 매핑: 전체 팔레트 기준으로 grid + 개수 계산
+  // -----------------------------
   gridW = W;
   gridH = H;
-  grid = Array.from({length:H}, () => new Array(W).fill(0));
+  grid = Array.from({ length: H }, () => new Array(W).fill(0));
 
   const hexToIndex = new Map();
-  palette.forEach((p,i) => hexToIndex.set(p.hex, i));
+  palette.forEach((p, i) => hexToIndex.set(p.hex, i));
 
-  const counts = new Array(palette.length).fill(0);
+  let counts = new Array(palette.length).fill(0);
 
-  for (let y=0; y<H; y++) {
-    for (let x=0; x<W; x++) {
-      const i = (y*W + x)*4;
-      let r = d[i], g = d[i+1], b = d[i+2], a = d[i+3];
-      if (a === 0) { r=g=b=255; }
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      let r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+      if (a === 0) { r = g = b = 255; } // 완전 투명 → 흰색
 
-      const c = nearestColor(r,g,b,palette);
+      const c = nearestColor(r, g, b, palette);
       const idx = hexToIndex.get(c.hex) ?? 0;
+
       grid[y][x] = idx;
       counts[idx]++;
     }
   }
 
+  const totalBeads = W * H;
+
+  // -----------------------------
+  // 색 개수 제한: "많이 쓰인 색" 상위 N개만 남기기
+  // -----------------------------
+  const colorCountVal = parseInt(colorCountInput.value, 10);
+
+  if (!Number.isNaN(colorCountVal) && colorCountVal > 0) {
+    // 각 색의 사용량 정보
+    let stats = palette.map((p, idx) => ({
+      idx,
+      color: p,
+      count: counts[idx]
+    })).filter(s => s.count > 0); // 실제로 쓰인 색만
+
+    if (colorCountVal < stats.length) {
+      // 사용량 기준 내림차순 정렬
+      stats.sort((a, b) => b.count - a.count);
+
+      // 상위 N개만 유지
+      const keepStats = stats.slice(0, colorCountVal);
+      const newPalette = keepStats.map(s => s.color);
+
+      // 기존 인덱스 → 새 인덱스 매핑표
+      const oldIndexToNew = new Array(palette.length).fill(-1);
+      keepStats.forEach((s, newIdx) => {
+        oldIndexToNew[s.idx] = newIdx;
+      });
+
+      // grid 재매핑 + 새 카운트 계산
+      const newCounts = new Array(newPalette.length).fill(0);
+
+      for (let y = 0; y < gridH; y++) {
+        for (let x = 0; x < gridW; x++) {
+          const oldIdx = grid[y][x];
+          let newIdx = oldIndexToNew[oldIdx];
+
+          // 버려진 색이면, 남은 색들 중 가장 비슷한 색으로 붙여줌
+          if (newIdx === -1) {
+            const oldColor = palette[oldIdx];
+            let bestIdx = 0;
+            let bestDist = Infinity;
+            for (let k = 0; k < newPalette.length; k++) {
+              const nc = newPalette[k];
+              const dr = oldColor.r - nc.r;
+              const dg = oldColor.g - nc.g;
+              const db = oldColor.b - nc.b;
+              const dist = dr * dr + dg * dg + db * db;
+              if (dist < bestDist) {
+                bestDist = dist;
+                bestIdx = k;
+              }
+            }
+            newIdx = bestIdx;
+          }
+
+          grid[y][x] = newIdx;
+          newCounts[newIdx]++;
+        }
+      }
+
+      palette = newPalette;
+      counts = newCounts;
+    }
+  }
+
+  // -----------------------------
+  // 실제 그리기 + 상태 문구
+  // -----------------------------
   drawPatternAndLegend(counts);
   statusEl.textContent =
-  `완료되었습니다. 총 비즈 ${totalBeads}개, 사용 색상 ${usedColorStats.size}개입니다.`;
+    `완료되었습니다. 총 비즈 ${totalBeads}개, 사용 색상 ${palette.length}개입니다.`;
   downloadButton.disabled = false;
 });
 
