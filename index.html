@@ -268,8 +268,13 @@
       <label>최대 사용 색 개수 (비우면 전체 사용)</label>
       <input type="number" id="colorCount" min="1" placeholder="예: 5" />
 
-      <!-- 버튼들을 팔레트 위로 올림 -->
       <div class="button-row">
+        <input
+    type="text"
+    id="fileNameInput"
+    placeholder="파일 이름 (확장자 없이)"
+    style="flex:1; min-width:0; padding:6px 8px; font-size:12px; border-radius:8px; border:1px solid #ccc;"
+  />
         <button id="dotButton" disabled>도안 생성</button>
         <button id="downloadButton" disabled>PNG 저장</button>
       </div>
@@ -359,7 +364,8 @@ const legendEl         = document.getElementById("legend");
 const statusEl         = document.getElementById("status");
 const paletteBox       = document.getElementById("paletteBox");
 const addPaletteRowBtn = document.getElementById("addPaletteRow");
-
+const fileNameInput    = document.getElementById("fileNameInput");
+  
 const originalCanvas = document.getElementById("originalCanvas");
 const originalCtx    = originalCanvas.getContext("2d");
 const patternCanvas  = document.getElementById("patternCanvas");
@@ -859,7 +865,15 @@ downloadButton.addEventListener("click", () => {
   }
 
   const a = document.createElement("a");
-  a.download = "bead_pattern.png";
+  let baseName = (fileNameInput?.value || "").trim();
+  if (!baseName) {
+  baseName = "bead_pattern";        // 기본값
+  }
+  if (!baseName.toLowerCase().endsWith(".png")) {
+  baseName += ".png";
+  }
+
+  a.download = baseName;
   a.href = exportCanvas.toDataURL("image/png");
   a.click();
 });
