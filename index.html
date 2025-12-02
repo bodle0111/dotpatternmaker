@@ -684,12 +684,15 @@ dotButton.addEventListener("click", () => {
     }
   }
 
-  // -----------------------------
+    // -----------------------------
   // 실제 그리기 + 상태 문구
   // -----------------------------
   drawPatternAndLegend(counts);
+  const usedColorCount = counts.filter(c => c > 0).length;
+
   statusEl.textContent =
-    `완료되었습니다. 총 비즈 ${totalBeads}개, 사용 색상 ${palette.length}개입니다.`;
+    `완료되었습니다. 총 비즈 ${totalBeads}개, 사용 색상 ${usedColorCount}개입니다.`;
+
   downloadButton.disabled = false;
 });
 
