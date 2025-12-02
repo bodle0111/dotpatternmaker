@@ -371,6 +371,7 @@ let loadedImage = null;
 let gridW = 0, gridH = 0;
 let grid = null;        // [y][x] = 색 인덱스
 let palette = [];       // 사용 팔레트(제한 후)
+let lastCounts = null;  // ✅ 마지막 도안의 색별 개수 저장
 const CELL_SIZE = 18;
 const BEADS_PER_CM = 4; // 1cm당 비즈 수(고정)
 
@@ -710,6 +711,7 @@ function drawPatternAndLegend(countsFromGrid) {
     }
   }
 
+  lastCounts = counts.slice();
   patternCanvas.width = W * CELL_SIZE;
   patternCanvas.height = H * CELL_SIZE;
   patternCtx.clearRect(0,0,patternCanvas.width,patternCanvas.height);
@@ -801,9 +803,64 @@ downloadButton.addEventListener("click", () => {
     alert("먼저 도안을 생성해 주십시오.");
     return;
   }
+
+  const W = gridW;
+  const H = gridH;
+  const counts = lastCounts && palette.length ? lastCounts : null;
+
+  // 범례용 텍스트 만들기
+  let legendLines = [];
+  if (counts) {
+    const totalBeads = W * H;
+    let usedColorCount = 0;
+
+    palette.forEach((p, idx) => {
+      const c = counts[idx] || 0;
+      if (!c) return;
+      usedColorCount++;
+      const percent = ((c / totalBeads) * 100).toFixed(1);
+      legendLines.push(
+        `${p.symbol}  ${p.beadCode}  ${p.hex} — ${c}개 (${percent}%)`
+      );
+    });
+
+    // 맨 위에 총합 한 줄 추가
+    legendLines.unshift(
+      `총 비즈 ${totalBeads}개, 사용 색상 ${usedColorCount}개`
+    );
+  }
+
+  const lineHeight = 16;
+  const margin = 8;
+  const extraHeight = counts
+    ? margin * 2 + legendLines.length * lineHeight
+    : 0;
+
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width  = patternCanvas.width;
+  exportCanvas.height = patternCanvas.height + extraHeight;
+
+  const ctx = exportCanvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+  // 위쪽에 도안 붙이기
+  ctx.drawImage(patternCanvas, 0, 0);
+
+  // 아래쪽에 비즈 정보 쓰기
+  if (counts) {
+    ctx.fillStyle = "#000000";
+    ctx.font = "12px system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+    let y = patternCanvas.height + margin + 12;
+    legendLines.forEach(line => {
+      ctx.fillText(line, 8, y);
+      y += lineHeight;
+    });
+  }
+
   const a = document.createElement("a");
   a.download = "bead_pattern.png";
-  a.href = patternCanvas.toDataURL("image/png");
+  a.href = exportCanvas.toDataURL("image/png");
   a.click();
 });
 </script>
