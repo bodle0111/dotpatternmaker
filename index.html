@@ -550,13 +550,38 @@ dotButton.addEventListener("click", () => {
     alert("팔레트가 비어 있습니다. 색상과 비즈 번호를 입력해 주십시오.");
     return;
   }
+// -----------------------------
+// 색 개수 제한: 많이 쓰인 색 상위 N개
+// -----------------------------
+const colorCountVal = parseInt(colorCountInput.value, 10);
+let usedArray = Array.from(usedColorStats.values());
 
-  // 색 개수 제한
-  const colorCountVal = parseInt(colorCountInput.value,10);
-  if (!Number.isNaN(colorCountVal) && colorCountVal > 0 && colorCountVal < pal.length) {
-    pal = pal.slice(0, colorCountVal);
+if (!Number.isNaN(colorCountVal) && colorCountVal > 0 && colorCountVal < usedArray.length) {
+  // 사용량 기준 정렬 (내림차순)
+  usedArray.sort((a, b) => b.count - a.count);
+
+  // 상위 N개 색만 사용
+  const limitedPalette = usedArray.slice(0, colorCountVal).map(v => v.color);
+
+  // cellInfo를 limitedPalette 기준으로 다시 매핑
+  const newStats = new Map();
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const orig = cellInfo[y][x];
+      const c2 = nearestColor(orig.r, orig.g, orig.b, limitedPalette);
+      cellInfo[y][x] = c2;
+
+      let stat = newStats.get(c2.hex);
+      if (!stat) {
+        stat = { color: c2, count: 0 };
+        newStats.set(c2.hex, stat);
+      }
+      stat.count++;
+    }
   }
 
+  usedColorStats = newStats;
+}
   // 심볼 부여
   pal.forEach((p, idx) => {
     p.symbol = SYMBOLS[idx % SYMBOLS.length];
@@ -618,7 +643,8 @@ dotButton.addEventListener("click", () => {
   }
 
   drawPatternAndLegend(counts);
-  statusEl.textContent = `완료되었습니다. 총 비즈 ${W*H}개`;
+  statusEl.textContent =
+  `완료되었습니다. 총 비즈 ${totalBeads}개, 사용 색상 ${usedColorStats.size}개입니다.`;
   downloadButton.disabled = false;
 });
 
