@@ -785,11 +785,18 @@ function drawPatternAndLegend(countsFromGrid) {
 
 /* ---------- 도안 클릭 편집 (색 순환) ---------- */
 
-patternCanvas.addEventListener("click", (e) => {
+// 공통 처리 함수
+function handleCanvasTap(ev) {
   if (!grid || !palette.length) return;
+
   const rect = patternCanvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+
+  // 화면에 보이는 크기 대비 실제 캔버스 픽셀 크기 비율
+  const scaleX = patternCanvas.width  / rect.width;
+  const scaleY = patternCanvas.height / rect.height;
+
+  const x = (ev.clientX - rect.left) * scaleX;
+  const y = (ev.clientY - rect.top)  * scaleY;
 
   const cx = Math.floor(x / CELL_SIZE);
   const cy = Math.floor(y / CELL_SIZE);
@@ -800,7 +807,24 @@ patternCanvas.addEventListener("click", (e) => {
   grid[cy][cx] = next;
 
   drawPatternAndLegend(); // 카운트 다시 계산
+}
+
+// 마우스 클릭
+patternCanvas.addEventListener("click", (e) => {
+  handleCanvasTap(e);
 });
+
+// 터치(모바일)
+patternCanvas.addEventListener(
+  "touchstart",
+  (e) => {
+    e.preventDefault();          // 스크롤 방지
+    const t = e.touches[0];
+    if (!t) return;
+    handleCanvasTap(t);          // 터치 좌표 사용
+  },
+  { passive: false }
+);
 
 /* ---------- PNG 저장 ---------- */
 
