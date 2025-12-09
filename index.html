@@ -415,6 +415,7 @@ function createPaletteRow(hex, code) {
 
 /* 초기 팔레트 채우기 */
 window.addEventListener("load", () => {
+  paletteBox.innerHTML = "";
   for (let i = 0; i < defaultPaletteHexList.length; i++) {
     createPaletteRow(defaultPaletteHexList[i], defaultBeadCodeList[i] || "");
   }
@@ -561,7 +562,7 @@ dotButton.addEventListener("click", () => {
 
   statusEl.textContent = "도안을 생성하는 중입니다...";
 
-  // 2) 원본 이미지를 W×H로 축소 (맞추는 방식 반영)
+  // 2) 원본 이미지를 W×H로 축소
   const temp = document.createElement("canvas");
   temp.width = W;
   temp.height = H;
